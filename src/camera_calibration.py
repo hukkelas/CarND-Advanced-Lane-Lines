@@ -2,6 +2,8 @@ import cv2
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+
+
 nx = 9 #TODO: enter the number of inside corners in x
 ny = 6 #TODO: enter the number of inside corners in y
 CALIBRATION_BASE_PATH = "camera_cal/*.jpg"
@@ -24,21 +26,22 @@ def get_calibration_points():
             imgpoints.append(corners)
             objpoints.append(np.copy(objp))
     return imgpoints, objpoints
-            
 
-
-def cal_undistort(img, objpoints, imgpoints):
+def compute_calibration_coefficients():
+    img = cv2.imread("camera_cal/calibration1.jpg")
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    imgpoints, objpoints = get_calibration_points()
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+    return dist, mtx
 
-    dst = cv2.undistort(img, mtx, dist, None, mtx)
-    return dst
+def undistort(img, mtx, dist):
+    return cv2.undistort(img, mtx, dist, None, mtx)
 
 
 if __name__ == '__main__':
-    imgpoints, objpoints = get_calibration_points()
     test_image = cv2.imread("camera_cal/calibration1.jpg")
-    undistorted = cal_undistort(test_image, objpoints, imgpoints)
+    dist, mtx = compute_calibration_coefficients()
+    undistorted = undistort(test_image, mtx, dist)
     plt.subplot(1,2,1)
     plt.imshow(test_image)
     plt.subplot(1,2,2)
