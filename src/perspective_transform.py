@@ -35,8 +35,7 @@ def perspective_projection(gray):
     M = cv2.getPerspectiveTransform(src[:-1], dst[:-1])
     img_size =(gray.shape[1], gray.shape[0])
     warped = cv2.warpPerspective(gray, M, img_size)
-    return warped
-
+    return warped, M
 
 if __name__ == '__main__':
     test_image_files = glob.glob('test_images/*.jpg')
@@ -53,7 +52,7 @@ if __name__ == '__main__':
         plt.subplot(2,2,3)
         gray = compute_binary_image(img)
         plt.imshow(gray, cmap='gray')        
-        warped = perspective_projection(gray)
+        warped, M = perspective_projection(gray)
         plt.subplot(2,2,4)
         plt.imshow(warped, cmap="gray")
         plt.show()
