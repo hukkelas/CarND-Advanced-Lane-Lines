@@ -1,6 +1,8 @@
 import cv2
 import glob
 import numpy as np
+import matplotlib
+matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from camera_calibration import compute_calibration_coefficients, undistort
 from thresholding import compute_binary_image
@@ -117,8 +119,7 @@ def fit_polynomial(binary_warped):
     out_img[righty, rightx] = [0, 0, 255]
 
     # Plots the left and right polynomials on the lane lines
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
+
 
     return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx
 
@@ -144,11 +145,30 @@ def measure_curvature_pixels(ploty, left_fit, right_fit):
     
     return left_curverad, right_curverad
 
+def map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv):
+    warp_zero = np.zeros_like(warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (img.shape[1], img.shape[0])) 
+    # Combine the result with the original image
+    result = cv2.addWeighted(img, 1, newwarp, 0.3, 0)
+    return result
+
+
 if __name__ == '__main__':
     test_image_files = glob.glob('test_images/*.jpg')
     dist, mtx = compute_calibration_coefficients()
     for f in test_image_files:
-        plt.figure(figsize=(20,20))
+        plt.figure(figsize=(10,10))
         img = cv2.imread(f)
 
         img = undistort(img, mtx, dist)
@@ -164,27 +184,18 @@ if __name__ == '__main__':
         leftx, lefty, rightx, righty, out_img = find_lane_pixels(warped)
         plt.subplot(2,2,2)
         plt.imshow(out_img)
+  
 
         out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_polynomial(warped)
+                
         plt.subplot(2,2,3)
+        plt.plot(left_fitx, ploty, color='yellow')
+        plt.plot(right_fitx, ploty, color='yellow')      
         plt.imshow(out_img)
         left_curverad, right_curverad = measure_curvature_pixels(ploty, left_fit, right_fit)
         plt.subplot(2,2,4)
-        warp_zero = np.zeros_like(warped).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        result = map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv)
 
-        # Recast the x and y points into usable format for cv2.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-        pts = np.hstack((pts_left, pts_right))
-
-        # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
-
-        # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, Minv, (img.shape[1], img.shape[0])) 
-        # Combine the result with the original image
-        result = cv2.addWeighted(img, 1, newwarp, 0.3, 0)
         plt.imshow(result)
         plt.show()
 
