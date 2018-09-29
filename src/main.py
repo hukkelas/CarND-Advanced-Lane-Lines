@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from camera_calibration import compute_calibration_coefficients, undistort
 from thresholding import compute_binary_image
 from perspective_transform import perspective_projection
-from lane_finding import measure_curvature_pixels, Lines
+from lane_finding import measure_curvature, Lines
 from moviepy.editor import VideoFileClip
 
 dist, mtx = compute_calibration_coefficients()
@@ -47,9 +47,9 @@ def process_video(input_path, output_path="output_images/test.mp4"):
 
 if __name__ == '__main__':
   if True:
-    #process_video("project_video.mp4", "output_images/test.mp4")
-    process_video("challenge_video.mp4", 'output_images/challenge_video_out.mp4')
-    #process_video("harder_challenge_video.mp4", "output_images/harder_challenge_video_out.mp4")
+    process_video("project_video.mp4", "output_videos/project_video_out.mp4")
+    process_video("challenge_video.mp4", 'output_videos/challenge_video_out.mp4')
+    process_video("harder_challenge_video.mp4", "output_videos/harder_challenge_video_out.mp4")
   else:
     test_image_files = glob.glob('test_images/*.jpg')
     dist, mtx = compute_calibration_coefficients()

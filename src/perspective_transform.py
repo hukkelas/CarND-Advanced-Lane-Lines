@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from camera_calibration import compute_calibration_coefficients, undistort
 from thresholding import compute_binary_image
-
+from camera_calibration import rgb
 def get_src_points(img):
     height, width = img.shape[:2]
     src = np.float32([
@@ -15,6 +15,7 @@ def get_src_points(img):
         (width*10//90, height),
         (width*31//70, height*19//30),
     ])
+    #plt.plot([e[0] for e in src], [e[1] for e in src])
     return src
 def get_dst_points(img):
     height, width = img.shape[:2]    
@@ -25,6 +26,7 @@ def get_dst_points(img):
         (width*10//90, height),
         (width*10//90, 0),        
     ])
+    #plt.plot([e[0] for e in dst], [e[1] for e in dst])
     return dst
 def perspective_projection(gray):
     # (x, y)
@@ -40,10 +42,10 @@ def perspective_projection(gray):
 if __name__ == '__main__':
     test_image_files = glob.glob('test_images/*.jpg')
     dist, mtx = compute_calibration_coefficients()
-    for f in test_image_files:
+    for f in test_image_files[:2]:
 
         plt.figure(figsize=(20,20))
-        img = cv2.imread(f)
+        img = rgb(cv2.imread(f))
         plt.subplot(2,2,1)
         plt.imshow(img)
         img = undistort(img, mtx, dist)
@@ -55,7 +57,8 @@ if __name__ == '__main__':
         warped, M = perspective_projection(gray)
         plt.subplot(2,2,4)
         plt.imshow(warped, cmap="gray")
-        plt.show()
+        #plt.show()
+        plt.savefig("output_images/perspective_transform_output.jpg")
 
 
 

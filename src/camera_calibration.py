@@ -37,13 +37,32 @@ def compute_calibration_coefficients():
 def undistort(img, mtx, dist):
     return cv2.undistort(img, mtx, dist, None, mtx)
 
+def rgb(img):
+    return np.fliplr(img.reshape(-1,3)).reshape(img.shape)
+
 
 if __name__ == '__main__':
     test_image = cv2.imread("camera_cal/calibration1.jpg")
     dist, mtx = compute_calibration_coefficients()
     undistorted = undistort(test_image, mtx, dist)
+    plt.figure(figsize=(20,20))
     plt.subplot(1,2,1)
     plt.imshow(test_image)
     plt.subplot(1,2,2)
     plt.imshow(undistorted)
-    plt.show()
+    plt.savefig("output_images/undistorted_example1.jpg")
+    #plt.show()
+
+
+
+    # On a test image
+    plt.figure(figsize=(20,20))
+    test_image = cv2.imread("test_images/straight_lines2.jpg")
+    undistorted1 = undistort(test_image, mtx, dist)
+    plt.subplot(1,2,1)
+    plt.imshow(rgb(test_image))
+    plt.subplot(1,2,2)
+    plt.imshow(rgb(undistorted1))
+
+    plt.savefig("output_images/undistorted_example2.jpg")
+    #plt.show()

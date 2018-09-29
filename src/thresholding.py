@@ -2,7 +2,7 @@ import cv2
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
-
+from camera_calibration import rgb
 def sobel_threshold(img):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     sobelx = np.absolute(cv2.Sobel(gray, cv2.CV_64F, 1, 0))
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     test_image_files = glob.glob('test_images/test1.jpg')
     for f in test_image_files:
         img = cv2.imread(f)
-        plt.figure(figsize=(10,10))
+        plt.figure(figsize=(20,20))
         sobel = sobel_threshold(img)
         plt.imshow(sobel, cmap="gray")
         hls_binary = hls_threshold(img)
@@ -46,10 +46,10 @@ if __name__ == '__main__':
         plt.imshow(color_binary)
         combined_binary = np.zeros_like(sobel)
         combined_binary[(sobel == 1) | (hls_binary == 1)] = 1
-        plt.subplot(2,2,1)
+        plt.subplot(2,2,2)
         
         plt.imshow(combined_binary, cmap="gray")
-        plt.subplot(2,2,2)
-        plt.imshow(img)
-        plt.show()
+        plt.subplot(2,2,1)
+        plt.imshow(rgb(img))
+        plt.savefig("output_images/thresholding_example.jpg")
 

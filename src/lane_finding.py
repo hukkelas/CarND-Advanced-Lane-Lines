@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from camera_calibration import compute_calibration_coefficients, undistort
+from camera_calibration import compute_calibration_coefficients, undistort, rgb
 from thresholding import compute_binary_image
 from perspective_transform import perspective_projection
 
@@ -117,9 +117,10 @@ def fit_polynomial(binary_warped):
     out_img[righty, rightx] = [0, 0, 255]
 
     # Plots the left and right polynomials on the lane lines
+    left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)    
 
-
-    return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx
+    return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx, left_fit_cr, right_fit_cr
 
 def fit_poly(binary_warped, leftx, lefty, rightx, righty):
 
@@ -136,6 +137,7 @@ def fit_poly(binary_warped, leftx, lefty, rightx, righty):
 def get_x_coordinate(fit, ploty):
     return fit[0]*ploty**2 + fit[1]*ploty + fit[2]
 
+# using a previous found polynomial to try to fit a new one onto the warped image. 
 def search_around_poly(binary_warped, left_fit, right_fit):
     # HYPERPARAMETER
     # Choose the width of the margin around the previous polynomial to search
@@ -166,56 +168,82 @@ def search_around_poly(binary_warped, left_fit, right_fit):
 
     # Fit new polynomials
     out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_poly(binary_warped, leftx, lefty, rightx, righty)
+    left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)    
+    return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx, left_fit_cr, right_fit_cr
+
+# Assume a lane is 3.7m
+def distance_to_center(img, left_fit, right_fit):
     
-    return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx
+    leftx = left_fit[-1]
+    rightx = right_fit[-1]
+    xm_per_pix = 3.7 / (rightx - leftx) 
+    center = (leftx + (rightx - leftx) / 2) * xm_per_pix
+    position = (img.shape[1] * xm_per_pix) / 2
+    distance = abs(center - position)
+    return distance
+
 
 class Lines:
 
     def __init__(self):
+        self.history_size = 10
         self.left_fit, self.right_fit = None, None
         self.reset_count = 0
+        self.left_fits = []
+        self.right_fits = []
     
     def find_lines(self, img, warped, Minv):
-        warp_zero = compute_binary_image(img)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-        return color_warp * 255
         if self.left_fit is None or self.right_fit is None:
             # No lane lines found before
-            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_polynomial(warped)
+            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx, left_fit_cr, right_fit_cr = fit_polynomial(warped)
         else:
-            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = search_around_poly(warped, self.left_fit, self.right_fit)
+            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx, left_fit_cr, right_fit_cr = search_around_poly(warped, self.left_fit, self.right_fit)
 
+        
               
-        if self.should_reset(ploty, left_fit, right_fit, left_fitx, right_fitx):
+        if self.should_reset(ploty, left_fit, right_fit, left_fitx, right_fitx, left_fit_cr, right_fit_cr):
             self.reset_count += 1
             if self.left_fit is not None and self.right_fit is not None:
                 left_fitx = get_x_coordinate(self.left_fit, ploty)
                 right_fitx = get_x_coordinate(self.right_fit, ploty)
-            if self.reset_count > 5:
+            if self.reset_count > 10:
                 print("Reset fit")
                 self.left_fit, self.right_fit = None, None
-                self.reset_count = 0
+                self.right_fits = []
+                self.left_fits = []
+
         else:
-            self.left_fit, self.right_fit = left_fit, right_fit      
+            self.left_fits.append(left_fit)
+            self.right_fits.append(right_fit)                  
+            self.left_fit = np.mean(self.left_fits, axis=0)
+            self.right_fit = np.mean(self.right_fits, axis=0)
+            left_fitx = get_x_coordinate(self.left_fit, ploty)
+            right_fitx = get_x_coordinate(self.right_fit, ploty)
+            if len(self.left_fits) > self.history_size:
+                del self.left_fits[0]
+                del self.right_fits[0]
             self.reset_count = 0
+            distance = distance_to_center(img, self.left_fit, self.right_fit)
         return map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv)
     
+    def distance_to_center(self, img):
+        return distance_to_center(img, self.left_fit, self.right_fit)
     # Sanity check
-    def should_reset(self, ploty, left_fit, right_fit, left_fitx, right_fitx):
+    def should_reset(self, ploty, left_fit, right_fit, left_fitx, right_fitx, left_fit_cr, right_fit_cr):
 
         # 
-        left_curverad, right_curverad = measure_curvature_pixels(ploty, left_fit, right_fit)
+        left_curverad, right_curverad = measure_curvature(ploty, left_fit_cr, right_fit_cr)
+        self.left_curverad, self.right_curverad = left_curverad, right_curverad
         if left_curverad*0.9 <= right_curverad and left_curverad*1.1 >= right_curverad:
             return True
         
         distance = right_fitx - left_fitx
         if (distance < 0).sum() > 0: # If the right lane is crossing left lane
-            print("Right lane crossing left lane")
             return True
         std = distance.std()
         distance -= distance.mean()
         if (np.abs(distance) > std*2.5).sum() > 0:
-            print("Greater than 2x standard deviation")
             return True
 
         
@@ -223,24 +251,26 @@ class Lines:
         # Should be within 10% error
         return 
 
+# Define conversions in x and y from pixels space to meters
+ym_per_pix = 30/720 # meters per pixel in y dimension
+xm_per_pix = 3.7/700 # meters per pixel in x dimension
 def curvature(fit, y):
     A, B, C = fit
-    top = (1 + (2*A*y + B )**2)**(3/2)
+    top = (1 + (2*A*y*ym_per_pix + B )**2)**(3/2)
     bottom = np.abs(2*A)
     return top / bottom
 
-def measure_curvature_pixels(ploty, left_fit, right_fit):
+def measure_curvature(ploty, left_fit_cr, right_fit_cr):
 
     # Start by generating our fake example data
     # Make sure to feed in your real data instead in your project!
-
     # Define y-value where we want radius of curvature
     # We'll choose the maximum y-value, corresponding to the bottom of the image
     y_eval = np.max(ploty)
     
     ##### TO-DO: Implement the calculation of R_curve (radius of curvature) #####
-    left_curverad = curvature(left_fit, y_eval)  ## Implement the calculation of the left line here
-    right_curverad = curvature(right_fit, y_eval)  ## Implement the calculation of the right line here
+    left_curverad = curvature(left_fit_cr, y_eval)  ## Implement the calculation of the left line here
+    right_curverad = curvature(right_fit_cr, y_eval)  ## Implement the calculation of the right line here
     
     return left_curverad, right_curverad
 
@@ -264,16 +294,18 @@ def map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv):
 
 
 if __name__ == '__main__':
-    #test_image_files = glob.glob('test_images/*.jpg')
+    
     test_image_files = [
         "test_images/test6.jpg",
         "test_images/test4.jpg",
         "test_images/test1.jpg",
         "test_images/test5.jpg"
     ]
+    test_image_files = glob.glob('test_images/*.jpg')
     dist, mtx = compute_calibration_coefficients()
     line = Lines()
-    for f in test_image_files:
+    for f in test_image_files[:1]:
+        line = Lines()
         """
         plt.figure(figsize=(10,10))
         img = cv2.imread(f)
@@ -306,19 +338,22 @@ if __name__ == '__main__':
         plt.imshow(result)
         """
         plt.figure(figsize=(10,10))
-        img = cv2.imread(f)
+        img = rgb(cv2.imread(f))
 
         img = undistort(img, mtx, dist)
-
+        
         gray = compute_binary_image(img)
         warped, M = perspective_projection(gray)
         Minv = np.linalg.inv(M)
-
+        
 
         result = line.find_lines(img, warped, Minv)
-
-        plt.imshow(result)        
-        plt.show()
+        #print(line.left_curverad, line.right_curverad)
+        #print(line.distance_to_center(img))
+        plt.title(f"Distance to Center= {line.distance_to_center(img):.3f}, Left curverad = {line.left_curverad:.1f}, Right Curverad={line.right_curverad:.1f}")
+        plt.imshow( result)        
+        plt.savefig("output_images/lane_finding_output.jpg")
+        #plt.show()
 
 
 
