@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def sobel_threshold(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     sobelx = np.absolute(cv2.Sobel(gray, cv2.CV_64F, 1, 0))
     sobelx = np.uint8(255*sobelx/np.max(sobelx))
     thresh_min = 20
@@ -15,7 +15,7 @@ def sobel_threshold(img):
 
 
 def hls_threshold(img):
-    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     s_channel = hls[:,:,2]
     s_thresh_min = 170
     s_thresh_max = 255
@@ -34,10 +34,10 @@ def compute_binary_image(img):
 
 if __name__ == '__main__':
 
-    test_image_files = glob.glob('test_images/*.jpg')
+    test_image_files = glob.glob('test_images/test1.jpg')
     for f in test_image_files:
         img = cv2.imread(f)
-        plt.figure(figsize=(20,20))
+        plt.figure(figsize=(10,10))
         sobel = sobel_threshold(img)
         plt.imshow(sobel, cmap="gray")
         hls_binary = hls_threshold(img)

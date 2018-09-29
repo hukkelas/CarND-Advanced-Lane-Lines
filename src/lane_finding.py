@@ -9,6 +9,18 @@ from thresholding import compute_binary_image
 from perspective_transform import perspective_projection
 
 
+def hist(img):
+    # TO-DO: Grab only the bottom half of the image
+    # Lane lines are likely to be mostly vertical nearest to the car
+    bottom_half = img[img.shape[0]//2:, :]
+    
+    # TO-DO: Sum across image pixels vertically - make sure to set `axis`
+    # i.e. the highest areas of vertical lines should be larger values
+    
+    histogram = np.sum(bottom_half, axis=0)
+    
+    return histogram
+
 def find_start_position(img):
     # Take a histogram of the bottom half of the image
     histogram = hist(img)
@@ -86,20 +98,6 @@ def find_lane_pixels(img):
 
     return leftx, lefty, rightx, righty, out_img
 
-def hist(img):
-    # TO-DO: Grab only the bottom half of the image
-    # Lane lines are likely to be mostly vertical nearest to the car
-    bottom_half = img[img.shape[0]//2:, :]
-    
-    # TO-DO: Sum across image pixels vertically - make sure to set `axis`
-    # i.e. the highest areas of vertical lines should be larger values
-    
-    histogram = np.sum(bottom_half, axis=0)
-    
-    return histogram
-
-
-
 def fit_polynomial(binary_warped):
     # Find our lane pixels first
     leftx, lefty, rightx, righty, out_img = find_lane_pixels(binary_warped)
@@ -123,6 +121,107 @@ def fit_polynomial(binary_warped):
 
     return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx
 
+def fit_poly(binary_warped, leftx, lefty, rightx, righty):
+
+    # Fit a second order polynomial to each using `np.polyfit`
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+    
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+    left_fitx = get_x_coordinate(left_fit, ploty)
+    right_fitx = get_x_coordinate(right_fit, ploty)
+    return None, left_fit, right_fit, ploty, left_fitx, right_fitx
+
+def get_x_coordinate(fit, ploty):
+    return fit[0]*ploty**2 + fit[1]*ploty + fit[2]
+
+def search_around_poly(binary_warped, left_fit, right_fit):
+    # HYPERPARAMETER
+    # Choose the width of the margin around the previous polynomial to search
+    # The quiz grader expects 100 here, but feel free to tune on your own!
+    margin = 100
+
+    # Grab activated pixels
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    
+    ### TO-DO: Set the area of search based on activated x-values ###
+    ### within the +/- margin of our polynomial function ###
+    ### Hint: consider the window areas for the similarly named variables ###
+    ### in the previous quiz, but change the windows to our new search area ###
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                    left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                    left_fit[1]*nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                    right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                    right_fit[1]*nonzeroy + right_fit[2] + margin)))
+    
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    # Fit new polynomials
+    out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_poly(binary_warped, leftx, lefty, rightx, righty)
+    
+    return out_img, left_fit, right_fit, ploty, left_fitx, right_fitx
+
+class Lines:
+
+    def __init__(self):
+        self.left_fit, self.right_fit = None, None
+        self.reset_count = 0
+    
+    def find_lines(self, img, warped, Minv):
+        warp_zero = compute_binary_image(img)
+        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        return color_warp * 255
+        if self.left_fit is None or self.right_fit is None:
+            # No lane lines found before
+            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_polynomial(warped)
+        else:
+            out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = search_around_poly(warped, self.left_fit, self.right_fit)
+
+              
+        if self.should_reset(ploty, left_fit, right_fit, left_fitx, right_fitx):
+            self.reset_count += 1
+            if self.left_fit is not None and self.right_fit is not None:
+                left_fitx = get_x_coordinate(self.left_fit, ploty)
+                right_fitx = get_x_coordinate(self.right_fit, ploty)
+            if self.reset_count > 5:
+                print("Reset fit")
+                self.left_fit, self.right_fit = None, None
+                self.reset_count = 0
+        else:
+            self.left_fit, self.right_fit = left_fit, right_fit      
+            self.reset_count = 0
+        return map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv)
+    
+    # Sanity check
+    def should_reset(self, ploty, left_fit, right_fit, left_fitx, right_fitx):
+
+        # 
+        left_curverad, right_curverad = measure_curvature_pixels(ploty, left_fit, right_fit)
+        if left_curverad*0.9 <= right_curverad and left_curverad*1.1 >= right_curverad:
+            return True
+        
+        distance = right_fitx - left_fitx
+        if (distance < 0).sum() > 0: # If the right lane is crossing left lane
+            print("Right lane crossing left lane")
+            return True
+        std = distance.std()
+        distance -= distance.mean()
+        if (np.abs(distance) > std*2.5).sum() > 0:
+            print("Greater than 2x standard deviation")
+            return True
+
+        
+
+        # Should be within 10% error
+        return 
 
 def curvature(fit, y):
     A, B, C = fit
@@ -165,9 +264,17 @@ def map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv):
 
 
 if __name__ == '__main__':
-    test_image_files = glob.glob('test_images/*.jpg')
+    #test_image_files = glob.glob('test_images/*.jpg')
+    test_image_files = [
+        "test_images/test6.jpg",
+        "test_images/test4.jpg",
+        "test_images/test1.jpg",
+        "test_images/test5.jpg"
+    ]
     dist, mtx = compute_calibration_coefficients()
+    line = Lines()
     for f in test_image_files:
+        """
         plt.figure(figsize=(10,10))
         img = cv2.imread(f)
 
@@ -197,6 +304,20 @@ if __name__ == '__main__':
         result = map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv)
 
         plt.imshow(result)
+        """
+        plt.figure(figsize=(10,10))
+        img = cv2.imread(f)
+
+        img = undistort(img, mtx, dist)
+
+        gray = compute_binary_image(img)
+        warped, M = perspective_projection(gray)
+        Minv = np.linalg.inv(M)
+
+
+        result = line.find_lines(img, warped, Minv)
+
+        plt.imshow(result)        
         plt.show()
 
 

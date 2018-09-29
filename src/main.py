@@ -16,23 +16,20 @@ import matplotlib.pyplot as plt
 from camera_calibration import compute_calibration_coefficients, undistort
 from thresholding import compute_binary_image
 from perspective_transform import perspective_projection
-from lane_finding import measure_curvature_pixels, fit_polynomial, map_lane_lines_to_original
+from lane_finding import measure_curvature_pixels, Lines
 from moviepy.editor import VideoFileClip
 
 dist, mtx = compute_calibration_coefficients()
 
+lines = Lines()
 
 
 def find_lines(img):
   img = undistort(img, mtx, dist)
-  
   gray = compute_binary_image(img)
   warped, M = perspective_projection(gray)
   Minv = np.linalg.inv(M)
-
-  out_img, left_fit, right_fit, ploty, left_fitx, right_fitx = fit_polynomial(warped)
-  left_curverad, right_curverad = measure_curvature_pixels(ploty, left_fit, right_fit)
-  result = map_lane_lines_to_original(img, warped, left_fitx, right_fitx, ploty, Minv)
+  result = lines.find_lines(img, warped, Minv)
   return result
 
 
@@ -50,9 +47,9 @@ def process_video(input_path, output_path="output_images/test.mp4"):
 
 if __name__ == '__main__':
   if True:
-    #process_video("project_video.mp4")
-    #process_video("challenge_video.mp4", 'challenge_video_out.mp4')
-    process_video("harder_challenge_video.mp4", "output_images/harder_challenge_video_out.mp4")
+    #process_video("project_video.mp4", "output_images/test.mp4")
+    process_video("challenge_video.mp4", 'output_images/challenge_video_out.mp4')
+    #process_video("harder_challenge_video.mp4", "output_images/harder_challenge_video_out.mp4")
   else:
     test_image_files = glob.glob('test_images/*.jpg')
     dist, mtx = compute_calibration_coefficients()
