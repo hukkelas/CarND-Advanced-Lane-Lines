@@ -45,7 +45,7 @@ I start by preparing "object points", which will be the (x, y, z) coordinates of
 
 I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
 
-![alt text][output_images/undistorted_example1.jpg]
+![alt text](output_images/undistorted_example1.jpg)
 The left side is the undistorted image, and the right image is the distortion-corrected image.
 
 ### Pipeline (single images)
@@ -53,7 +53,7 @@ The left side is the undistorted image, and the right image is the distortion-co
 #### 1. Provide an example of a distortion-corrected image.
 
 To undistort the image, I first compute the camera calibration and distortion coefficients as explained above. Then I apply distortien correction on a test image and obtain this result: 
-![alt text][output_images/undistorted_example1.jpg]
+![alt text](output_images/undistorted_example2.jpg)
 The left side is the undistorted image, and the right image is the distortion-corrected image.
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
@@ -61,7 +61,7 @@ The left side is the undistorted image, and the right image is the distortion-co
 I used a combination of HLS thresholding on the S-channel, as well as a sobel filter on the x-axis to generate the binary thresholded image. The code can be seen in `src/thresholding.py`. 
 Here's an example of my output for this step.
 
-![alt text][output_images/thresholding_example.jpg]
+![alt text](output_images/thresholding_example.jpg)
 In the left top corner is the input image. In the right top corner is the output binary map.
 In the left bottom corner is a visualization showing the green colors the lines caught by the sobelx thresholding, and the blue color showing the thresholding on the S-Channel in the HLS image.
 
@@ -88,7 +88,7 @@ dst = np.float32([
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 
-![alt text][output_images/perspective_transform_output.jpg]
+![alt text](output_images/perspective_transform_output.jpg)
 
 The top row shows the input image, as well as the distortion-corrected image(to the right). 
 The bottom left image shows the binary-thresholded image with the blue box showing the source points, and the orange points showing the destination points. 
@@ -98,39 +98,18 @@ To the bottom right is the final output of the perspective transform.
 The main pipeline for lane-line finding is located in line 172 - 211 in `src/lane_finding.py`. 
 This takes in the original image `img`, together with the warped image `warped`. Then I follow the pipeline:
 
-If there is no previous frame, I fit a new polynomial to the warped image by using a histogram search on the bottomo of the image to find the starting position, then using a sliding window approach to search for the lane line.
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+If there is no previous frame, I fit a new polynomial to the warped image by using a histogram search on the bottomo of the image to find the starting position, then using a sliding window approach to search for the lane line. 
 
-If there is a previous frame I alr
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-eady have a fitted polynomial which I can use to simplify my search by looking around this polynomial 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-with a certain margin. 
-
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-
-Then by these results I verify tha
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-t the lane-lines are correct by confirming that both (1) the curverad of both the lines are wit
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-hin 10% of eachother, and (2) that the lane-lines are not crossing. This logic is found in `should_res
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-et`. 
-By tracking how many frames in a r
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-ow that has been incorrect, I do a hard reset if this count is above 10.
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+If there is a previous frame I already have a fitted polynomial which I can use to simplify my search by looking around this polynomial with a certain margin. 
 
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+Then by these results I verify that the lane-lines are correct by confirming that both (1) the curverad of both the lines are within 10% of eachother, and (2) that the lane-lines are not crossing. This logic is found in `should_reset`. 
+By tracking how many frames in a row that has been incorrect, I do a hard reset if this count is above 10.
 
-When I have confirmed that my foun
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
-d polynomial fits are correct, I track the results and take the mean of the last 20 frames to get a smoothed estimate of the lane lines. 
+When I have confirmed that my found polynomial fits are correct, I track the results and take the mean of the last 20 frames to get a smoothed estimate of the lane lines. 
 
 Finally, I map the results on the original image by using the function `map_lane_lines_to_original`. 
 
-![alt text][image5]
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 The radius of curvature is calculated in `measure_curvature` which is in line 260-272 in `lane_finding.py` I compute the left_fit and right_fit in the correct cordinate frame, then find the curvature shown the function  `curvature(...)`. 
@@ -143,7 +122,7 @@ By knowing this, and the lane lines position in pixels, I compute the estimated 
 
 To map the lane lines to the road, I implemented this in `map_lane_lines_to_original(..)` in line 274 in `lane_finding.py`. Here is an example of my result on a test image:
 
-![alt text][output_images/lane_finding_output.jpg]
+![alt text](output_images/lane_finding_output.jpg)
 
 ---
 
